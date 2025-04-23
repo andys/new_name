@@ -23,11 +23,11 @@ type Reader struct {
 	sourceDB *db.Connection
 	pool     pond.Pool
 	progress *Progress
-	writer   WriterPool
+	writer   *Writer
 }
 
 // NewReader creates a new reader worker pool
-func NewReader(sourceDB *db.Connection, writer WriterPool, maxWorkers int) *Reader {
+func NewReader(sourceDB *db.Connection, writer *Writer, maxWorkers int) *Reader {
 	return &Reader{
 		sourceDB: sourceDB,
 		pool:     pond.NewPool(maxWorkers),
@@ -103,9 +103,7 @@ func (r *Reader) process(schema *db.TableSchema) error {
 		anonymizer.Anonymize(&row)
 
 		// Submit to writer
-		if err := r.writer.Submit(row); err != nil {
-			return fmt.Errorf("failed to submit row to writer: %w", err)
-		}
+		r.writer.Submit(row)
 	}
 
 	return rows.Err()

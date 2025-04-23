@@ -6,19 +6,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/andys/new_name/anonymizer"
 	"github.com/andys/new_name/config"
 	"github.com/andys/new_name/db"
 	"github.com/andys/new_name/worker"
 	"github.com/urfave/cli/v2"
 )
-
-// stubWriter is a temporary implementation of the WriterPool interface
-type stubWriter struct{}
-
-func (w *stubWriter) Submit(row anonymizer.Row) error {
-	return nil
-}
 
 func main() {
 	var cfg config.Config
@@ -89,8 +81,8 @@ func main() {
 			}
 			fmt.Printf("\nFound %d tables with %d total columns\n", len(schemas), totalColumns)
 
-			// Create stub writer
-			writer := &stubWriter{}
+			// Create writer with 10 workers
+			writer := worker.NewWriter(destDB, 10)
 
 			// Create reader with 10 workers
 			reader := worker.NewReader(sourceDB, writer, 10)
@@ -106,8 +98,9 @@ func main() {
 					if processed >= progress.TotalTables {
 						return
 					}
-					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s)                                  ",
-						processed, progress.TotalTables, progress.CurrentTable)
+					writerProgress := writer.GetProgress()
+					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s, Rows: %d)                                  ",
+						processed, progress.TotalTables, progress.CurrentTable, writerProgress.ProcessedRows.Load())
 				}
 			}()
 
