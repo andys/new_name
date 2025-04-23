@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/andys/new_name/anonymizer"
+	"github.com/andys/new_name/config"
 	"github.com/andys/new_name/db"
 	"github.com/andys/new_name/worker"
 	"github.com/urfave/cli/v2"
@@ -14,49 +16,58 @@ import (
 // stubWriter is a temporary implementation of the WriterPool interface
 type stubWriter struct{}
 
-func (w *stubWriter) Submit(row worker.Row) error {
+func (w *stubWriter) Submit(row anonymizer.Row) error {
 	return nil
 }
 
-type DatabaseConfig struct {
-	SourceURL      string
-	DestinationURL string
-}
-
 func main() {
-	var config DatabaseConfig
+	var cfg config.Config
 
 	app := &cli.App{
 		Name:  "db-anonymizer",
 		Usage: "Anonymize database content from source to destination",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
+				Name:        "config",
+				Aliases:     []string{"c"},
+				Usage:       "Config file path",
+				Value:       "new_name.conf",
+				Destination: &cfg.ConfigFile,
+			},
+			&cli.StringFlag{
 				Name:        "source",
 				Aliases:     []string{"s"},
 				Usage:       "Source database URL (e.g., mysql://user:pass@host:port/dbname or postgres://user:pass@host:port/dbname)",
 				Required:    true,
 				EnvVars:     []string{"SOURCE_DB_URL"},
-				Destination: &config.SourceURL,
+				Destination: &cfg.SourceURL,
 			},
 			&cli.StringFlag{
-				Name:        "destination",
+				Name:        "dest",
 				Aliases:     []string{"d"},
 				Usage:       "Destination database URL (e.g., mysql://user:pass@host:port/dbname or postgres://user:pass@host:port/dbname)",
 				Required:    true,
 				EnvVars:     []string{"DEST_DB_URL"},
-				Destination: &config.DestinationURL,
+				Destination: &cfg.DestinationURL,
 			},
 		},
 		Action: func(c *cli.Context) error {
+
+			// Load configuration
+			err := config.LoadConfig(&cfg, cfg.ConfigFile)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			// Connect to source database
-			sourceDB, err := db.Connect(config.SourceURL)
+			sourceDB, err := db.Connect(cfg.SourceURL)
 			if err != nil {
 				return fmt.Errorf("failed to connect to source database: %w", err)
 			}
 			defer sourceDB.Close()
 
 			// Connect to destination database
-			destDB, err := db.Connect(config.DestinationURL)
+			destDB, err := db.Connect(cfg.DestinationURL)
 			if err != nil {
 				return fmt.Errorf("failed to connect to destination database: %w", err)
 			}

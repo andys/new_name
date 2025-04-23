@@ -33,6 +33,8 @@ func Connect(dbURL string) (*Connection, error) {
 	var conn Connection
 	var dsn string
 
+	fmt.Printf("Connecting to %s database...\n", dbURL)
+
 	switch u.Scheme {
 	case "mysql":
 		conn.Type = MySQL

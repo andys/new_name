@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alitto/pond/v2"
+	"github.com/andys/new_name/anonymizer"
 	"github.com/andys/new_name/db"
 )
 
@@ -93,13 +94,13 @@ func (r *Reader) process(schema *db.TableSchema) error {
 		}
 
 		// Create row struct
-		row := Row{
+		row := anonymizer.Row{
 			Schema: schema,
 			Data:   data,
 		}
 
 		// Anonymize the row
-		r.anonymize(&row)
+		anonymizer.Anonymize(&row)
 
 		// Submit to writer
 		if err := r.writer.Submit(row); err != nil {
@@ -108,11 +109,6 @@ func (r *Reader) process(schema *db.TableSchema) error {
 	}
 
 	return rows.Err()
-}
-
-// anonymize performs data anonymization on a row
-func (r *Reader) anonymize(row *Row) {
-	// Stub - will be implemented later
 }
 
 // GetProgress returns the current progress
