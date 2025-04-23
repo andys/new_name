@@ -4,10 +4,19 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/andys/new_name/db"
+	"github.com/andys/new_name/worker"
 	"github.com/urfave/cli/v2"
 )
+
+// stubWriter is a temporary implementation of the WriterPool interface
+type stubWriter struct{}
+
+func (w *stubWriter) Submit(row worker.Row) error {
+	return nil
+}
 
 type DatabaseConfig struct {
 	SourceURL      string
@@ -68,6 +77,38 @@ func main() {
 				totalColumns += len(table.Columns)
 			}
 			fmt.Printf("\nFound %d tables with %d total columns\n", len(schemas), totalColumns)
+
+			// Create stub writer
+			writer := &stubWriter{}
+
+			// Create reader with 10 workers
+			reader := worker.NewReader(sourceDB, writer, 10)
+
+			// Start a goroutine to periodically print progress
+			go func() {
+				ticker := time.NewTicker(300 * time.Millisecond)
+				defer ticker.Stop()
+
+				for range ticker.C {
+					progress := reader.GetProgress()
+					processed := progress.ProcessedTables.Load()
+					if processed >= progress.TotalTables {
+						return
+					}
+					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s)                                  ",
+						processed, progress.TotalTables, progress.CurrentTable)
+				}
+			}()
+
+			// Process tables
+			err = reader.ProcessTables(schemas)
+			if err != nil {
+				return fmt.Errorf("failed to process tables: %w", err)
+			}
+
+			// Add final success message with newline
+			fmt.Printf("\nAll %d tables processed successfully!\n", len(schemas))
+
 			return nil
 		},
 	}
