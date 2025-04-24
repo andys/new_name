@@ -1,11 +1,14 @@
 package worker
 
 import (
+	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
 	"github.com/alitto/pond/v2"
 	"github.com/andys/new_name/anonymizer"
+	"github.com/andys/new_name/config"
 	"github.com/andys/new_name/db"
 )
 
@@ -13,6 +16,7 @@ import (
 type WriterProgress struct {
 	CurrentTable  string
 	ProcessedRows atomic.Int64
+	ErrorCount    atomic.Int64
 	StartTime     time.Time
 }
 
@@ -21,16 +25,18 @@ type Writer struct {
 	destDB   *db.Connection
 	pool     pond.Pool
 	progress *WriterProgress
+	cfg      *config.Config
 }
 
 // NewWriter creates a new writer worker pool
-func NewWriter(destDB *db.Connection, maxWorkers int) *Writer {
+func NewWriter(destDB *db.Connection, maxWorkers int, cfg *config.Config) *Writer {
 	return &Writer{
 		destDB: destDB,
 		pool:   pond.NewPool(maxWorkers, pond.WithQueueSize(100000)),
 		progress: &WriterProgress{
 			StartTime: time.Now(),
 		},
+		cfg: cfg,
 	}
 }
 
@@ -48,10 +54,15 @@ func (w *Writer) Submit(row anonymizer.Row) {
 }
 
 // upsertRow handles the upsert operation for a single row
-// This is a stub that will be implemented later
 func (w *Writer) upsertRow(row anonymizer.Row) error {
-	// TODO: Implement actual upsert logic in db/transfer.go
-	return nil
+	err := w.destDB.UpsertRow(row.Schema, row.Data)
+	if err != nil {
+		w.progress.ErrorCount.Add(1)
+		if w.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "Error writing to table %s: %v\n", row.Schema.Name, err)
+		}
+	}
+	return err
 }
 
 // GetProgress returns the current progress

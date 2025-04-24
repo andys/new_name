@@ -2,11 +2,13 @@ package worker
 
 import (
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
 	"github.com/alitto/pond/v2"
 	"github.com/andys/new_name/anonymizer"
+	"github.com/andys/new_name/config"
 	"github.com/andys/new_name/db"
 )
 
@@ -24,10 +26,11 @@ type Reader struct {
 	pool     pond.Pool
 	progress *Progress
 	writer   *Writer
+	cfg      *config.Config
 }
 
 // NewReader creates a new reader worker pool
-func NewReader(sourceDB *db.Connection, writer *Writer, maxWorkers int) *Reader {
+func NewReader(sourceDB *db.Connection, writer *Writer, maxWorkers int, cfg *config.Config) *Reader {
 	return &Reader{
 		sourceDB: sourceDB,
 		pool:     pond.NewPool(maxWorkers),
@@ -35,6 +38,7 @@ func NewReader(sourceDB *db.Connection, writer *Writer, maxWorkers int) *Reader 
 			StartTime: time.Now(),
 		},
 		writer: writer,
+		cfg:    cfg,
 	}
 }
 
@@ -64,6 +68,9 @@ func (r *Reader) process(schema *db.TableSchema) error {
 
 	rows, err := r.sourceDB.GetDB().Query(query)
 	if err != nil {
+		if r.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "Error reading from table %s: %v\n", schema.Name, err)
+		}
 		return fmt.Errorf("failed to query table %s: %w", schema.Name, err)
 	}
 	defer rows.Close()

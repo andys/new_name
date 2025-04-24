@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/andys/new_name/config"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 )
@@ -21,10 +22,11 @@ const (
 type Connection struct {
 	db   *sql.DB
 	Type DBType
+	cfg  *config.Config
 }
 
 // Connect establishes a database connection from a URL string
-func Connect(dbURL string) (*Connection, error) {
+func Connect(dbURL string, cfg *config.Config, maxOpenConns int) (*Connection, error) {
 	u, err := url.Parse(dbURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid database URL: %w", err)
@@ -58,12 +60,16 @@ func Connect(dbURL string) (*Connection, error) {
 	}
 
 	// Test the connection
+	// Set the maximum number of open connections
+	db.SetMaxOpenConns(maxOpenConns)
+
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	conn.db = db
+	conn.cfg = cfg
 	return &conn, nil
 }
 
@@ -78,4 +84,40 @@ func (c *Connection) Close() error {
 // GetDB returns the underlying *sql.DB instance
 func (c *Connection) GetDB() *sql.DB {
 	return c.db
+}
+
+// DisableForeignKeyChecks disables foreign key constraint checking
+func (c *Connection) DisableForeignKeyChecks() error {
+	var query string
+	switch c.Type {
+	case MySQL:
+		query = "SET FOREIGN_KEY_CHECKS=0;"
+	case PostgreSQL:
+		query = "SET CONSTRAINTS ALL DEFERRED;"
+	default:
+		return fmt.Errorf("unsupported database type: %s", c.Type)
+	}
+
+	if _, err := c.db.Exec(query); err != nil {
+		return fmt.Errorf("failed to disable foreign key checks: %w", err)
+	}
+	return nil
+}
+
+// EnableForeignKeyChecks enables foreign key constraint checking
+func (c *Connection) EnableForeignKeyChecks() error {
+	var query string
+	switch c.Type {
+	case MySQL:
+		query = "SET FOREIGN_KEY_CHECKS=1;"
+	case PostgreSQL:
+		query = "SET CONSTRAINTS ALL IMMEDIATE;"
+	default:
+		return fmt.Errorf("unsupported database type: %s", c.Type)
+	}
+
+	if _, err := c.db.Exec(query); err != nil {
+		return fmt.Errorf("failed to enable foreign key checks: %w", err)
+	}
+	return nil
 }

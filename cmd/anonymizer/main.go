@@ -42,6 +42,20 @@ func main() {
 				EnvVars:     []string{"DEST_DB_URL"},
 				Destination: &cfg.DestinationURL,
 			},
+			&cli.BoolFlag{
+				Name:        "debug",
+				Aliases:     []string{},
+				Usage:       "Enable debug mode with verbose error output",
+				Value:       false,
+				Destination: &cfg.Debug,
+			},
+			&cli.BoolFlag{
+				Name:        "verbose",
+				Aliases:     []string{"v"},
+				Usage:       "Enable verbose SQL output",
+				Value:       false,
+				Destination: &cfg.Verbose,
+			},
 		},
 		Action: func(c *cli.Context) error {
 
@@ -52,18 +66,23 @@ func main() {
 			}
 
 			// Connect to source database
-			sourceDB, err := db.Connect(cfg.SourceURL)
+			sourceDB, err := db.Connect(cfg.SourceURL, &cfg, 10) // Set max connections to match writer workers
 			if err != nil {
 				return fmt.Errorf("failed to connect to source database: %w", err)
 			}
 			defer sourceDB.Close()
 
 			// Connect to destination database
-			destDB, err := db.Connect(cfg.DestinationURL)
+			destDB, err := db.Connect(cfg.DestinationURL, &cfg, 10) // Set max connections to match writer workers
 			if err != nil {
 				return fmt.Errorf("failed to connect to destination database: %w", err)
 			}
 			defer destDB.Close()
+
+			// Disable foreign key checks on the destination database
+			if err := destDB.DisableForeignKeyChecks(); err != nil {
+				return fmt.Errorf("failed to disable foreign key checks: %w", err)
+			}
 
 			fmt.Printf("Successfully connected to source (%s) and destination (%s) databases\n",
 				sourceDB.Type, destDB.Type)
@@ -81,11 +100,41 @@ func main() {
 			}
 			fmt.Printf("\nFound %d tables with %d total columns\n", len(schemas), totalColumns)
 
+			// Get schema from destination database
+			destSchemas, err := destDB.GetSchema()
+			if err != nil {
+				return fmt.Errorf("failed to get schema from destination database: %w", err)
+			}
+
+			// Create map of destination table names for quick lookup
+			destTables := make(map[string]bool)
+			for _, schema := range destSchemas {
+				destTables[schema.Name] = true
+			}
+
+			// Check that all source tables exist in destination
+			for _, sourceSchema := range schemas {
+				if !destTables[sourceSchema.Name] {
+					return fmt.Errorf("table '%s' exists in source but not in destination database", sourceSchema.Name)
+				}
+			}
+
+			// Truncate destination tables that have no ID field
+			for _, sourceSchema := range schemas {
+				if !sourceSchema.HasID {
+					fmt.Printf("Truncating destination table '%s' (no ID field)...\n", sourceSchema.Name)
+					query := fmt.Sprintf("TRUNCATE TABLE %s", sourceSchema.Name)
+					if _, err := destDB.GetDB().Exec(query); err != nil {
+						return fmt.Errorf("failed to truncate destination table '%s': %w", sourceSchema.Name, err)
+					}
+				}
+			}
+
 			// Create writer with 10 workers
-			writer := worker.NewWriter(destDB, 10)
+			writer := worker.NewWriter(destDB, 10, &cfg)
 
 			// Create reader with 10 workers
-			reader := worker.NewReader(sourceDB, writer, 10)
+			reader := worker.NewReader(sourceDB, writer, 10, &cfg)
 
 			// Start a goroutine to periodically print progress
 			go func() {
@@ -99,8 +148,10 @@ func main() {
 						return
 					}
 					writerProgress := writer.GetProgress()
-					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s, Rows: %d)                                  ",
-						processed, progress.TotalTables, progress.CurrentTable, writerProgress.ProcessedRows.Load())
+					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s, Rows: %d, Errors: %d)                                  ",
+						processed, progress.TotalTables, progress.CurrentTable,
+						writerProgress.ProcessedRows.Load(),
+						writerProgress.ErrorCount.Load())
 				}
 			}()
 
@@ -108,6 +159,11 @@ func main() {
 			err = reader.ProcessTables(schemas)
 			if err != nil {
 				return fmt.Errorf("failed to process tables: %w", err)
+			}
+
+			// Enable foreign key checks on the destination database
+			if err := destDB.EnableForeignKeyChecks(); err != nil {
+				return fmt.Errorf("failed to enable foreign key checks: %w", err)
 			}
 
 			// Add final success message with newline

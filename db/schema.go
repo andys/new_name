@@ -49,8 +49,9 @@ func (c *Connection) getMySQLSchema() ([]TableSchema, error) {
             CASE WHEN c.COLUMN_KEY = 'PRI' THEN 1 ELSE 0 END as IS_PRIMARY
         FROM information_schema.TABLES t
         JOIN information_schema.COLUMNS c 
-            ON t.TABLE_NAME = c.TABLE_NAME
+            ON t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_SCHEMA = c.TABLE_SCHEMA
         WHERE t.TABLE_SCHEMA = ?
+            AND t.TABLE_TYPE = 'BASE TABLE'
         ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION`
 
 	return c.processSchemaRows(query, dbName)
@@ -77,6 +78,7 @@ func (c *Connection) getPostgresSchema() ([]TableSchema, error) {
         ) pk ON t.table_name = pk.table_name 
             AND c.column_name = pk.column_name
         WHERE t.table_schema = 'public'
+            AND t.table_type = 'BASE TABLE'
         ORDER BY t.table_name, c.ordinal_position`
 
 	return c.processSchemaRows(query)
@@ -117,7 +119,7 @@ func (c *Connection) processSchemaRows(query string, args ...interface{}) ([]Tab
 		column := ColumnSchema{
 			Name:     columnName,
 			Type:     dataType,
-			IsID:     isPrimary,
+			IsID:     isPrimary && columnName == "id",
 			Nullable: isNullable,
 		}
 

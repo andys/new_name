@@ -9,11 +9,11 @@ import (
 
 // Config holds the anonymization configuration
 type Config struct {
-	SourceURL      string
-	DestinationURL string
-	ConfigFile     string
-
-	// map of table names to list of fields that need anonymization
+	SourceURL       string
+	DestinationURL  string
+	ConfigFile      string
+	Debug           bool
+	Verbose         bool // Add this line
 	AnonymizeFields map[string][]string
 }
 
