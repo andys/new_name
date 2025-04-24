@@ -87,7 +87,7 @@ func (c *Connection) GetDB() *sql.DB {
 }
 
 // DisableForeignKeyChecks disables foreign key constraint checking
-func (c *Connection) DisableForeignKeyChecks() error {
+func (c *Connection) DisableForeignKeyChecks(db *sql.Tx) error {
 	var query string
 	switch c.Type {
 	case MySQL:
@@ -98,7 +98,7 @@ func (c *Connection) DisableForeignKeyChecks() error {
 		return fmt.Errorf("unsupported database type: %s", c.Type)
 	}
 
-	if _, err := c.db.Exec(query); err != nil {
+	if _, err := db.Exec(query); err != nil {
 		return fmt.Errorf("failed to disable foreign key checks: %w", err)
 	}
 	return nil

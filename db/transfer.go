@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -24,35 +25,35 @@ func (c *Connection) UpsertRow(schema *TableSchema, data map[string]interface{})
 }
 
 func escapeIdentifier(identifier string, dbType DBType) string {
-    switch dbType {
-    case MySQL:
-        return fmt.Sprintf("`%s`", identifier)
-    case PostgreSQL:
-        return fmt.Sprintf(`"%s"`, identifier)
-    default:
-        return identifier
-    }
+	switch dbType {
+	case MySQL:
+		return fmt.Sprintf("`%s`", identifier)
+	case PostgreSQL:
+		return fmt.Sprintf(`"%s"`, identifier)
+	default:
+		return identifier
+	}
 }
 
 func escapeIdentifiers(identifiers []string, dbType DBType) []string {
-    escaped := make([]string, len(identifiers))
-    for i, id := range identifiers {
-        escaped[i] = escapeIdentifier(id, dbType)
-    }
-    return escaped
+	escaped := make([]string, len(identifiers))
+	for i, id := range identifiers {
+		escaped[i] = escapeIdentifier(id, dbType)
+	}
+	return escaped
 }
 
 func escapeUpdateClauses(clauses []string, dbType DBType) []string {
-    escaped := make([]string, len(clauses))
-    for i, clause := range clauses {
-        parts := strings.Split(clause, " = ")
-        if len(parts) == 2 {
-            escaped[i] = fmt.Sprintf("%s = %s", escapeIdentifier(parts[0], dbType), parts[1])
-        } else {
-            escaped[i] = clause
-        }
-    }
-    return escaped
+	escaped := make([]string, len(clauses))
+	for i, clause := range clauses {
+		parts := strings.Split(clause, " = ")
+		if len(parts) == 2 {
+			escaped[i] = fmt.Sprintf("%s = %s", escapeIdentifier(parts[0], dbType), parts[1])
+		} else {
+			escaped[i] = clause
+		}
+	}
+	return escaped
 }
 
 func (c *Connection) insertRow(schema *TableSchema, data map[string]interface{}) error {
@@ -82,9 +83,25 @@ func (c *Connection) insertRow(schema *TableSchema, data map[string]interface{})
 	if c.cfg.Verbose {
 		fmt.Printf("Executing SQL: %s\n", query)
 	}
-	if _, err := c.db.Exec(query, values...); err != nil {
+
+	tx, err := c.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if disableErr := c.DisableForeignKeyChecks(tx); disableErr != nil {
+		return fmt.Errorf("failed to disable foreign key checks: %w", disableErr)
+	}
+
+	if _, err := tx.Exec(query, values...); err != nil {
 		return fmt.Errorf("failed to execute query: %s, error: %w", query, err)
 	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }
 
@@ -106,7 +123,7 @@ func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{
 	for _, col := range schema.Columns {
 		if !col.IsID {
 			if _, ok := data[col.Name]; ok {
-				updateClauses = append(updateClauses, fmt.Sprintf("%s = VALUES(%s)", col.Name, col.Name))
+				updateClauses = append(updateClauses, fmt.Sprintf("%s = VALUES(%s)", escapeIdentifier(col.Name, c.Type), escapeIdentifier(col.Name, c.Type)))
 			}
 		}
 	}
@@ -118,7 +135,7 @@ func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{
 			escapeIdentifier(schema.Name, c.Type),
 			strings.Join(escapeIdentifiers(columns, c.Type), ", "),
 			strings.Join(placeholders, ", "),
-			strings.Join(escapeUpdateClauses(updateClauses, c.Type), ", "),
+			strings.Join(updateClauses, ", "),
 		)
 	} else {
 		query = fmt.Sprintf(
@@ -132,9 +149,24 @@ func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{
 	if c.cfg.Verbose {
 		fmt.Printf("Executing SQL: %s\n", query)
 	}
-	if _, err := c.db.Exec(query, values...); err != nil {
+	tx, err := c.db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer tx.Rollback()
+
+	if disableErr := c.DisableForeignKeyChecks(tx); disableErr != nil {
+		return fmt.Errorf("failed to disable foreign key checks: %w", disableErr)
+	}
+
+	if _, err := tx.Exec(query, values...); err != nil {
 		return fmt.Errorf("failed to execute query: %s, error: %w", query, err)
 	}
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return nil
 }
 
@@ -160,7 +192,7 @@ func (c *Connection) postgresUpsert(schema *TableSchema, data map[string]interfa
 	for _, col := range schema.Columns {
 		if !col.IsID {
 			if _, ok := data[col.Name]; ok {
-				updateClauses = append(updateClauses, fmt.Sprintf("%s = EXCLUDED.%s", col.Name, col.Name))
+				updateClauses = append(updateClauses, fmt.Sprintf("%s = EXCLUDED.%s", escapeIdentifier(col.Name, c.Type), escapeIdentifier(col.Name, c.Type)))
 			}
 		}
 	}
@@ -173,7 +205,7 @@ func (c *Connection) postgresUpsert(schema *TableSchema, data map[string]interfa
 			strings.Join(escapeIdentifiers(columns, c.Type), ", "),
 			strings.Join(placeholders, ", "),
 			strings.Join(escapeIdentifiers(idColumns, c.Type), ", "),
-			strings.Join(escapeUpdateClauses(updateClauses, c.Type), ", "),
+			strings.Join(updateClauses, ", "),
 		)
 	} else {
 		query = fmt.Sprintf(

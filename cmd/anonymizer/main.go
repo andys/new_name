@@ -79,11 +79,6 @@ func main() {
 			}
 			defer destDB.Close()
 
-			// Disable foreign key checks on the destination database
-			if err := destDB.DisableForeignKeyChecks(); err != nil {
-				return fmt.Errorf("failed to disable foreign key checks: %w", err)
-			}
-
 			fmt.Printf("Successfully connected to source (%s) and destination (%s) databases\n",
 				sourceDB.Type, destDB.Type)
 
