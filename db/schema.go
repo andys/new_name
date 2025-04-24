@@ -13,10 +13,11 @@ type TableSchema struct {
 
 // ColumnSchema represents the structure of a table column
 type ColumnSchema struct {
-	Name     string
-	Type     string
-	IsID     bool // True if this is an ID column
-	Nullable bool
+	Name      string
+	Type      string
+	IsID      bool // True if this is an ID column
+	Nullable  bool
+	MaxLength int // Maximum length for varchar fields
 }
 
 // GetSchema retrieves the database schema for all tables
@@ -46,7 +47,8 @@ func (c *Connection) getMySQLSchema() ([]TableSchema, error) {
             c.COLUMN_NAME,
             c.DATA_TYPE,
             CASE WHEN c.IS_NULLABLE = 'YES' THEN 1 ELSE 0 END as IS_NULLABLE,
-            CASE WHEN c.COLUMN_KEY = 'PRI' THEN 1 ELSE 0 END as IS_PRIMARY
+            CASE WHEN c.COLUMN_KEY = 'PRI' THEN 1 ELSE 0 END as IS_PRIMARY,
+            COALESCE(c.CHARACTER_MAXIMUM_LENGTH, 0) as MAX_LENGTH
         FROM information_schema.TABLES t
         JOIN information_schema.COLUMNS c 
             ON t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_SCHEMA = c.TABLE_SCHEMA
@@ -65,7 +67,8 @@ func (c *Connection) getPostgresSchema() ([]TableSchema, error) {
             c.column_name,
             c.data_type,
             CASE WHEN c.is_nullable = 'YES' THEN 1 ELSE 0 END as is_nullable,
-            CASE WHEN pk.column_name IS NOT NULL THEN 1 ELSE 0 END as is_primary
+            CASE WHEN pk.column_name IS NOT NULL THEN 1 ELSE 0 END as is_primary,
+            COALESCE(c.character_maximum_length, 0) as max_length
         FROM information_schema.tables t
         JOIN information_schema.columns c 
             ON t.table_name = c.table_name
@@ -98,8 +101,9 @@ func (c *Connection) processSchemaRows(query string, args ...interface{}) ([]Tab
 	for rows.Next() {
 		var tableName, columnName, dataType string
 		var isNullable, isPrimary bool
+		var maxLength int
 
-		if err := rows.Scan(&tableName, &columnName, &dataType, &isNullable, &isPrimary); err != nil {
+		if err := rows.Scan(&tableName, &columnName, &dataType, &isNullable, &isPrimary, &maxLength); err != nil {
 			return nil, fmt.Errorf("failed to scan schema row: %w", err)
 		}
 
@@ -117,10 +121,11 @@ func (c *Connection) processSchemaRows(query string, args ...interface{}) ([]Tab
 		}
 
 		column := ColumnSchema{
-			Name:     columnName,
-			Type:     dataType,
-			IsID:     isPrimary && columnName == "id",
-			Nullable: isNullable,
+			Name:      columnName,
+			Type:      dataType,
+			IsID:      isPrimary && columnName == "id",
+			Nullable:  isNullable,
+			MaxLength: maxLength,
 		}
 
 		if isPrimary {

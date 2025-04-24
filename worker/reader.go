@@ -107,7 +107,7 @@ func (r *Reader) process(schema *db.TableSchema) error {
 		}
 
 		// Anonymize the row
-		anonymizer.Anonymize(&row)
+		anonymizer.Anonymize(&row, r.cfg)
 
 		// Submit to writer
 		r.writer.Submit(row)
