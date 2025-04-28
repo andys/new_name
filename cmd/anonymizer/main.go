@@ -129,7 +129,7 @@ func main() {
 			writer := worker.NewWriter(destDB, 10, &cfg)
 
 			// Create reader with 10 workers
-			reader := worker.NewReader(sourceDB, writer, 10, &cfg)
+			reader := worker.NewReader(sourceDB, writer, 20, &cfg)
 
 			// Start a goroutine to periodically print progress
 			go func() {
