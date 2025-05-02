@@ -16,7 +16,7 @@ func main() {
 	var cfg config.Config
 
 	app := &cli.App{
-		Name:  "db-anonymizer",
+		Name:  "new_name",
 		Usage: "Anonymize database content from source to destination",
 		Flags: []cli.Flag{
 			&cli.StringFlag{

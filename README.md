@@ -14,7 +14,7 @@ Database Anonymizer is a tool for copying data from a source database to a desti
 ## Usage
 
 ```
-db-anonymizer --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] [--debug] [--verbose]
+new_name --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] [--debug] [--verbose]
 ```
 
 ### CLI Options
@@ -69,6 +69,5 @@ This means the `name` and `email` fields in the `users` table, and the `address`
 ## Example
 
 ```
-db-anonymizer --source "mysql://user:pass@localhost:3306/prod" --dest "mysql://user:pass@localhost:3306/dev" --config new_name.conf --verbose
+new_name --source "mysql://user:pass@localhost:3306/prod" --dest "mysql://user:pass@localhost:3306/dev" --config new_name.conf --verbose
 ```
-

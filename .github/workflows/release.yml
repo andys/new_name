@@ -28,7 +28,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/anonymizer.amd64
-            release/anonymizer.arm64
+            release/new_name.amd64
+            release/new_name.arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
