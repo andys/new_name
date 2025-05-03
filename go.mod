@@ -1,6 +1,6 @@
 module github.com/andys/new_name
 
-go 1.22
+go 1.23.0
 
 toolchain go1.23.4
 
@@ -12,6 +12,7 @@ require (
 	github.com/go-sql-driver/mysql v1.9.2
 	github.com/lib/pq v1.10.9
 	github.com/urfave/cli/v2 v2.27.6
+	golang.org/x/term v0.31.0
 )
 
 require (
@@ -23,4 +24,5 @@ require (
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
+	golang.org/x/sys v0.32.0 // indirect
 )

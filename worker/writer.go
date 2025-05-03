@@ -33,7 +33,7 @@ type Writer struct {
 func NewWriter(destDB *db.Connection, maxWorkers int, cfg *config.Config) *Writer {
 	return &Writer{
 		destDB: destDB,
-		pool:   pond.NewPool(maxWorkers, pond.WithQueueSize(maxWorkers * 2000)),
+		pool:   pond.NewPool(maxWorkers, pond.WithQueueSize(maxWorkers*2000)),
 		progress: &WriterProgress{
 			StartTime: time.Now(),
 		},

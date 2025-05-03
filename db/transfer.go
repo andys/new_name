@@ -271,6 +271,7 @@ func (c *Connection) postgresUpsert(schema *TableSchema, data map[string]interfa
 	}
 	return nil
 }
+
 // DeleteBatch deletes rows from the given table where id is between minID and maxID and not in the provided ids.
 // ids must be a pre-sorted, non-empty slice of interface{} representing the IDs to keep.
 func (c *Connection) DeleteBatch(table string, idCol string, ids []interface{}) error {

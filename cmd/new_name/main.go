@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/andys/new_name/config"
 	"github.com/andys/new_name/db"
 	"github.com/andys/new_name/worker"
@@ -138,25 +140,27 @@ func main() {
 			// Create reader with 10 workers
 			reader := worker.NewReader(sourceDB, writer, cfg.WorkerCount, &cfg)
 
-			// Start a goroutine to periodically print progress
-			go func() {
-				ticker := time.NewTicker(300 * time.Millisecond)
-				defer ticker.Stop()
+			// Only print progress if stdin is a TTY
+			if term.IsTerminal(int(os.Stdin.Fd())) {
+				go func() {
+					ticker := time.NewTicker(300 * time.Millisecond)
+					defer ticker.Stop()
 
-				for range ticker.C {
-					progress := reader.GetProgress()
-					processed := progress.ProcessedTables.Load()
-					if processed >= progress.TotalTables {
-						return
+					for range ticker.C {
+						progress := reader.GetProgress()
+						processed := progress.ProcessedTables.Load()
+						if processed >= progress.TotalTables {
+							return
+						}
+						writerProgress := writer.GetProgress()
+						fmt.Printf("\rProgress: %d/%d tables processed (Current: %s, Rows: %d, Deleted: %d, Errors: %d)                                  ",
+							processed, progress.TotalTables, progress.CurrentTable,
+							writerProgress.ProcessedRows.Load(),
+							writerProgress.DeletedRows.Load(),
+							writerProgress.ErrorCount.Load())
 					}
-					writerProgress := writer.GetProgress()
-					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s, Rows: %d, Deleted: %d, Errors: %d)                                  ",
-						processed, progress.TotalTables, progress.CurrentTable,
-						writerProgress.ProcessedRows.Load(),
-						writerProgress.DeletedRows.Load(),
-						writerProgress.ErrorCount.Load())
-				}
-			}()
+				}()
+			}
 
 			// Process tables
 			err = reader.ProcessTables(schemas)
