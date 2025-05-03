@@ -33,7 +33,7 @@ type Writer struct {
 func NewWriter(destDB *db.Connection, maxWorkers int, cfg *config.Config) *Writer {
 	return &Writer{
 		destDB: destDB,
-		pool:   pond.NewPool(maxWorkers, pond.WithQueueSize(100000)),
+		pool:   pond.NewPool(maxWorkers, pond.WithQueueSize(maxWorkers * 2000)),
 		progress: &WriterProgress{
 			StartTime: time.Now(),
 		},
@@ -85,13 +85,6 @@ func (w *Writer) DeleteBatch(table string, idCol string, ids []interface{}) {
 		return err
 	})
 }
-
-/*
-// Stop stops the worker pool and waits for all tasks to complete
-func (w *Writer) Stop() {
-	w.pool.StopAndWait()
-}
-*/
 
 // StopAndWait stops the worker pool and waits for all tasks to complete
 func (w *Writer) StopAndWait() {
