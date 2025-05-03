@@ -163,6 +163,9 @@ func main() {
 				return fmt.Errorf("failed to process tables: %w", err)
 			}
 
+			// Wait for all writer tasks to finish
+			writer.StopAndWait()
+
 			// Enable foreign key checks on the destination database
 			if err := destDB.EnableForeignKeyChecks(); err != nil {
 				return fmt.Errorf("failed to enable foreign key checks: %w", err)
