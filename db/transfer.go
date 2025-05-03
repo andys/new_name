@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -105,6 +106,42 @@ func (c *Connection) insertRow(schema *TableSchema, data map[string]interface{})
 	}
 
 	return nil
+}
+
+// DeleteBatch deletes rows from the given table where id is between minID and maxID and not in the provided ids.
+// ids must be a pre-sorted, non-empty slice of interface{} representing the IDs to keep.
+func (c *Connection) DeleteBatch(table string, idCol string, ids []interface{}) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	minID := ids[0]
+	maxID := ids[len(ids)-1]
+
+	// Build placeholders for the NOT IN clause
+	placeholders := make([]string, len(ids))
+	args := []interface{}{minID, maxID}
+	for i := range ids {
+		placeholders[i] = "?"
+		args = append(args, ids[i])
+	}
+
+	query := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s BETWEEN ? AND ? AND %s NOT IN (%s)",
+		escapeIdentifier(table, c.Type),
+		escapeIdentifier(idCol, c.Type),
+		escapeIdentifier(idCol, c.Type),
+		strings.Join(placeholders, ", "),
+	)
+
+	if c.cfg.Verbose {
+		fmt.Printf("Executing SQL: %s\n", query)
+	}
+
+	_, err := c.GetDB().Exec(query, args...)
+	if err != nil && c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "Error deleting from table %s: %v\n", table, err)
+	}
+	return err
 }
 
 func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{}) error {

@@ -70,7 +70,25 @@ func (w *Writer) GetProgress() WriterProgress {
 	return *w.progress
 }
 
+// DeleteBatch submits a job to delete rows in a range except for the provided IDs.
+// ids must be a pre-sorted, non-empty slice of interface{} representing the IDs to keep.
+func (w *Writer) DeleteBatch(table string, idCol string, ids []interface{}) {
+	if len(ids) == 0 {
+		return
+	}
+	w.pool.SubmitErr(func() error {
+		return w.destDB.DeleteBatch(table, idCol, ids)
+	})
+}
+
+/*
 // Stop stops the worker pool and waits for all tasks to complete
 func (w *Writer) Stop() {
+	w.pool.StopAndWait()
+}
+*/
+
+// StopAndWait stops the worker pool and waits for all tasks to complete
+func (w *Writer) StopAndWait() {
 	w.pool.StopAndWait()
 }

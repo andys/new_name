@@ -146,3 +146,32 @@ func TestPostgresUpsert(t *testing.T) {
 	err = conn.postgresUpsert(schema, data)
 	c.Assert(err, quicktest.IsNil)
 }
+
+func TestDeleteBatch(t *testing.T) {
+	c := quicktest.New(t)
+	dbMock, mock, err := sqlmock.New()
+	c.Assert(err, quicktest.IsNil)
+	defer dbMock.Close()
+
+	conn := &Connection{db: dbMock, Type: MySQL, cfg: &config.Config{}}
+
+	table := "users"
+	idCol := "id"
+	ids := []interface{}{1, 2, 3}
+
+	// The query should match the generated SQL in DeleteBatch
+	mock.ExpectExec("DELETE FROM `users` WHERE `id` BETWEEN \\? AND \\? AND `id` NOT IN \\(\\?, \\?, \\?\\)").
+		WithArgs(1, 3, 1, 2, 3).
+		WillReturnResult(sqlmock.NewResult(0, 3))
+
+	err = conn.DeleteBatch(table, idCol, ids)
+	c.Assert(err, quicktest.IsNil)
+}
+
+func TestDeleteBatch_EmptyIDs(t *testing.T) {
+	c := quicktest.New(t)
+	conn := &Connection{db: nil, Type: MySQL, cfg: &config.Config{}}
+	// Should do nothing and return nil
+	err := conn.DeleteBatch("users", "id", []interface{}{})
+	c.Assert(err, quicktest.IsNil)
+}
