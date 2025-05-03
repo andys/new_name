@@ -56,6 +56,13 @@ func main() {
 				Value:       false,
 				Destination: &cfg.Verbose,
 			},
+			&cli.IntFlag{
+				Name:        "workers",
+				Aliases:     []string{"w"},
+				Usage:       "Number of workers for reader/writer pools (default 4)",
+				Value:       4, // Default value
+				Destination: &cfg.WorkerCount,
+			},
 		},
 		Action: func(c *cli.Context) error {
 
@@ -66,14 +73,14 @@ func main() {
 			}
 
 			// Connect to source database
-			sourceDB, err := db.Connect(cfg.SourceURL, &cfg, 10) // Set max connections to match writer workers
+			sourceDB, err := db.Connect(cfg.SourceURL, &cfg, cfg.WorkerCount)
 			if err != nil {
 				return fmt.Errorf("failed to connect to source database: %w", err)
 			}
 			defer sourceDB.Close()
 
 			// Connect to destination database
-			destDB, err := db.Connect(cfg.DestinationURL, &cfg, 10) // Set max connections to match writer workers
+			destDB, err := db.Connect(cfg.DestinationURL, &cfg, cfg.WorkerCount)
 			if err != nil {
 				return fmt.Errorf("failed to connect to destination database: %w", err)
 			}
@@ -126,10 +133,10 @@ func main() {
 			}
 
 			// Create writer with 10 workers
-			writer := worker.NewWriter(destDB, 10, &cfg)
+			writer := worker.NewWriter(destDB, cfg.WorkerCount, &cfg)
 
 			// Create reader with 10 workers
-			reader := worker.NewReader(sourceDB, writer, 20, &cfg)
+			reader := worker.NewReader(sourceDB, writer, cfg.WorkerCount, &cfg)
 
 			// Start a goroutine to periodically print progress
 			go func() {

@@ -14,6 +14,7 @@ type Config struct {
 	ConfigFile      string
 	Debug           bool
 	Verbose         bool // Add this line
+	WorkerCount     int  // Number of workers for reader/writer pools
 	AnonymizeFields map[string][]string
 }
 

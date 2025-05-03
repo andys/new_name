@@ -14,7 +14,7 @@ Database Anonymizer is a tool for copying data from a source database to a desti
 ## Usage
 
 ```
-new_name --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] [--debug] [--verbose]
+new_name --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] [--debug] [--verbose] [--workers <N>]
 ```
 
 ### CLI Options
@@ -27,6 +27,8 @@ new_name --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] 
   Default: `new_name.conf`
 - `--debug`: Enable debug mode with verbose error output.
 - `--verbose`, `-v`: Enable verbose SQL output.
+- `--workers`, `-w`: Number of workers for reader/writer pools.  
+  Default: `4`
 
 You can also set the following environment variables as alternatives to CLI flags:
 - `SOURCE_DB_URL`
@@ -64,7 +66,7 @@ This means the `name` and `email` fields in the `users` table, and the `address`
 
 - **Safe Data Sharing**: Share production-like data without exposing sensitive information.
 - **Easy Integration**: Simple CLI and config file make it easy to use in CI/CD or developer workflows.
-- **Performance**: Parallel processing ensures fast operation even on large databases.
+- **Performance**: Parallel processing ensures fast operation even on large databases. The number of parallel workers can be controlled with the `--workers` option.
 
 ## Example
 
