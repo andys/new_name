@@ -150,9 +150,10 @@ func main() {
 						return
 					}
 					writerProgress := writer.GetProgress()
-					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s, Rows: %d, Errors: %d)                                  ",
+					fmt.Printf("\rProgress: %d/%d tables processed (Current: %s, Rows: %d, Deleted: %d, Errors: %d)                                  ",
 						processed, progress.TotalTables, progress.CurrentTable,
 						writerProgress.ProcessedRows.Load(),
+						writerProgress.DeletedRows.Load(),
 						writerProgress.ErrorCount.Load())
 				}
 			}()
@@ -173,6 +174,16 @@ func main() {
 
 			// Add final success message with newline
 			fmt.Printf("\nAll %d tables processed successfully!\n", len(schemas))
+
+			// Print final totals
+			writerProgress := writer.GetProgress()
+			readerProgress := reader.GetProgress()
+			fmt.Printf("Totals: Tables: %d, Rows: %d, Deleted: %d, Errors: %d\n",
+				readerProgress.ProcessedTables.Load(),
+				writerProgress.ProcessedRows.Load(),
+				writerProgress.DeletedRows.Load(),
+				writerProgress.ErrorCount.Load(),
+			)
 
 			return nil
 		},

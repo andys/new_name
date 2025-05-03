@@ -108,11 +108,12 @@ func (c *Connection) insertRow(schema *TableSchema, data map[string]interface{})
 	return nil
 }
 
-// DeleteBatch deletes rows from the given table where id is between minID and maxID and not in the provided ids.
+// DeleteBatchWithCount deletes rows from the given table where id is between minID and maxID and not in the provided ids.
+// Returns the number of rows deleted and any error that occurred.
 // ids must be a pre-sorted, non-empty slice of interface{} representing the IDs to keep.
-func (c *Connection) DeleteBatch(table string, idCol string, ids []interface{}) error {
+func (c *Connection) DeleteBatchWithCount(table string, idCol string, ids []interface{}) (int64, error) {
 	if len(ids) == 0 {
-		return nil
+		return 0, nil
 	}
 	minID := ids[0]
 	maxID := ids[len(ids)-1]
@@ -137,11 +138,15 @@ func (c *Connection) DeleteBatch(table string, idCol string, ids []interface{}) 
 		fmt.Printf("Executing SQL: %s\n", query)
 	}
 
-	_, err := c.GetDB().Exec(query, args...)
-	if err != nil && c.cfg.Debug {
-		fmt.Fprintf(os.Stderr, "Error deleting from table %s: %v\n", table, err)
+	res, err := c.GetDB().Exec(query, args...)
+	if err != nil {
+		if c.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "Error deleting from table %s: %v\n", table, err)
+		}
+		return 0, err
 	}
-	return err
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{}) error {
@@ -265,4 +270,10 @@ func (c *Connection) postgresUpsert(schema *TableSchema, data map[string]interfa
 		return fmt.Errorf("failed to execute query: %s, error: %w", query, err)
 	}
 	return nil
+}
+// DeleteBatch deletes rows from the given table where id is between minID and maxID and not in the provided ids.
+// ids must be a pre-sorted, non-empty slice of interface{} representing the IDs to keep.
+func (c *Connection) DeleteBatch(table string, idCol string, ids []interface{}) error {
+	_, err := c.DeleteBatchWithCount(table, idCol, ids)
+	return err
 }

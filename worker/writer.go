@@ -16,6 +16,7 @@ import (
 type WriterProgress struct {
 	CurrentTable  string
 	ProcessedRows atomic.Int64
+	DeletedRows   atomic.Int64
 	ErrorCount    atomic.Int64
 	StartTime     time.Time
 }
@@ -77,7 +78,11 @@ func (w *Writer) DeleteBatch(table string, idCol string, ids []interface{}) {
 		return
 	}
 	w.pool.SubmitErr(func() error {
-		return w.destDB.DeleteBatch(table, idCol, ids)
+		n, err := w.destDB.DeleteBatchWithCount(table, idCol, ids)
+		if err == nil {
+			w.progress.DeletedRows.Add(int64(n))
+		}
+		return err
 	})
 }
 
