@@ -2,7 +2,6 @@ package db
 
 import (
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -57,6 +56,9 @@ func escapeUpdateClauses(clauses []string, dbType DBType) []string {
 }
 
 func (c *Connection) insertRow(schema *TableSchema, data map[string]interface{}) error {
+	if c.db == nil {
+		return fmt.Errorf("sql: database is closed")
+	}
 	columns := make([]string, 0, len(schema.Columns))
 	placeholders := make([]string, 0, len(schema.Columns))
 	values := make([]interface{}, 0, len(schema.Columns))
@@ -106,6 +108,9 @@ func (c *Connection) insertRow(schema *TableSchema, data map[string]interface{})
 }
 
 func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{}) error {
+	if c.db == nil {
+		return fmt.Errorf("sql: database is closed")
+	}
 	columns := make([]string, 0, len(schema.Columns))
 	placeholders := make([]string, 0, len(schema.Columns))
 	values := make([]interface{}, 0, len(schema.Columns))
@@ -151,7 +156,7 @@ func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{
 	}
 	tx, err := c.db.Begin()
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -162,9 +167,8 @@ func (c *Connection) mysqlUpsert(schema *TableSchema, data map[string]interface{
 	if _, err := tx.Exec(query, values...); err != nil {
 		return fmt.Errorf("failed to execute query: %s, error: %w", query, err)
 	}
-	err = tx.Commit()
-	if err != nil {
-		log.Fatal(err)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

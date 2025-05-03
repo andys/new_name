@@ -83,14 +83,15 @@ func TestProcessSchemaRows_ScanError(t *testing.T) {
 	c.Assert(err, quicktest.IsNil)
 	defer dbMock.Close()
 
-	mock.ExpectQuery("FROM information_schema.TABLES").
-		WillReturnRows(sqlmock.NewRows([]string{
-			"TABLE_NAME", "COLUMN_NAME", "DATA_TYPE", "IS_NULLABLE", "IS_PRIMARY", "MAX_LENGTH",
-		}).AddRow("users", []byte{0x01, 0x02}, "int", true, true, 0)) // COLUMN_NAME as []byte to force scan error
+	rows := sqlmock.NewRows([]string{
+		"TABLE_NAME", "COLUMN_NAME", "DATA_TYPE", "IS_NULLABLE", "IS_PRIMARY", "MAX_LENGTH",
+	}).AddRow("users", "id", "int", true, true, 0)
+	rows.RowError(0, errors.New("scan error"))
+	mock.ExpectQuery("FROM information_schema.TABLES").WillReturnRows(rows)
 
 	conn := &Connection{db: dbMock, Type: MySQL, cfg: &config.Config{}}
 	_, err = conn.processSchemaRows("FROM information_schema.TABLES")
-	c.Assert(err, quicktest.ErrorMatches, "failed to scan schema row: .*")
+	c.Assert(err, quicktest.ErrorMatches, "error iterating schema rows: .*")
 }
 
 func TestProcessSchemaRows_RowsErr(t *testing.T) {
