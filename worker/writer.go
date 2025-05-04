@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/alitto/pond/v2"
-	"github.com/andys/new_name/anonymizer"
-	"github.com/andys/new_name/config"
-	"github.com/andys/new_name/db"
+	"github.com/andys/new_names/anonymizer"
+	"github.com/andys/new_names/config"
+	"github.com/andys/new_names/db"
 )
 
 // WriterProgress tracks the progress of writing operations

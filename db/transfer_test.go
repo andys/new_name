@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/andys/new_name/config"
+	"github.com/andys/new_names/config"
 	"github.com/frankban/quicktest"
 )
 
@@ -185,6 +185,27 @@ func TestPostgresUpsert_Error(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO "test_table"`).WithArgs(1, "foo").WillReturnError(fmt.Errorf("fail"))
 	err = conn.postgresUpsert(schema, data)
 	c.Assert(err, quicktest.ErrorMatches, "failed to execute query: .*fail")
+}
+
+func TestDeleteBatchWithCount_SingleID(t *testing.T) {
+	c := quicktest.New(t)
+	dbMock, mock, err := sqlmock.New()
+	c.Assert(err, quicktest.IsNil)
+	defer dbMock.Close()
+
+	conn := &Connection{db: dbMock, Type: MySQL, cfg: &config.Config{}}
+	table := "test_table"
+	idCol := "id"
+	ids := []interface{}{42}
+
+	// Expect the correct SQL for single ID
+	mock.ExpectExec("DELETE FROM `test_table` WHERE `id` > ?").
+		WithArgs(42).
+		WillReturnResult(sqlmock.NewResult(0, 3)) // pretend 3 rows deleted
+
+	n, err := conn.DeleteBatchWithCount(table, idCol, ids)
+	c.Assert(err, quicktest.IsNil)
+	c.Assert(n, quicktest.Equals, int64(3))
 }
 
 func TestEscapeIdentifier(t *testing.T) {

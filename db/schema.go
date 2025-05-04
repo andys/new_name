@@ -8,7 +8,8 @@ import (
 type TableSchema struct {
 	Name    string
 	Columns []ColumnSchema
-	HasID   bool // Indicates if table has an ID field for upsert logic
+	HasID   bool   // Indicates if table has an ID field for upsert logic
+	IDCol   string // Name of the ID column, if any
 }
 
 // ColumnSchema represents the structure of a table column
@@ -130,6 +131,7 @@ func (c *Connection) processSchemaRows(query string, args ...interface{}) ([]Tab
 
 		if column.IsID {
 			currentSchema.HasID = true
+			currentSchema.IDCol = columnName
 		}
 
 		currentSchema.Columns = append(currentSchema.Columns, column)

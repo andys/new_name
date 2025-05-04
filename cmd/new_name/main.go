@@ -8,9 +8,9 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/andys/new_name/config"
-	"github.com/andys/new_name/db"
-	"github.com/andys/new_name/worker"
+	"github.com/andys/new_names/config"
+	"github.com/andys/new_names/db"
+	"github.com/andys/new_names/worker"
 	"github.com/urfave/cli/v2"
 )
 

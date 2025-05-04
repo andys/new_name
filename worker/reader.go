@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/alitto/pond/v2"
-	"github.com/andys/new_name/anonymizer"
-	"github.com/andys/new_name/config"
-	"github.com/andys/new_name/db"
+	"github.com/andys/new_names/anonymizer"
+	"github.com/andys/new_names/config"
+	"github.com/andys/new_names/db"
 )
 
 // Progress tracks the progress of table processing
@@ -47,7 +47,18 @@ func (r *Reader) ProcessTables(schemas []db.TableSchema) error {
 	r.progress.TotalTables = int64(len(schemas))
 	group := r.pool.NewGroup()
 
+	// Build skip set for fast lookup
+	skipSet := make(map[string]struct{}, len(r.cfg.SkipTables))
+	for _, t := range r.cfg.SkipTables {
+		skipSet[t] = struct{}{}
+	}
+
 	for _, schema := range schemas {
+		// Skip table if in skip list
+		if _, skip := skipSet[schema.Name]; skip {
+			continue
+		}
+
 		tableSchema := schema // Create local copy for closure
 
 		group.SubmitErr(func() error {
@@ -68,6 +79,12 @@ func (r *Reader) ProcessTables(schemas []db.TableSchema) error {
 
 // process handles reading and processing a single table
 func (r *Reader) processWithoutId(schema *db.TableSchema) error {
+	samplePct, doSample := r.cfg.SampleTables[schema.Name]
+	sampleMod := 1
+	if doSample {
+		sampleMod = int(1 / (samplePct / 100))
+	}
+
 	// Build query to select all rows from table
 	query := fmt.Sprintf("SELECT * FROM %s", schema.Name)
 
@@ -92,7 +109,7 @@ func (r *Reader) processWithoutId(schema *db.TableSchema) error {
 	for i := range values {
 		valuePtrs[i] = &values[i]
 	}
-
+	rowCount := 0
 	// Process each row
 	for rows.Next() {
 		if err := rows.Scan(valuePtrs...); err != nil {
@@ -105,17 +122,20 @@ func (r *Reader) processWithoutId(schema *db.TableSchema) error {
 			data[col] = values[i]
 		}
 
-		// Create row struct
-		row := anonymizer.Row{
-			Schema: schema,
-			Data:   data,
+		if rowCount%sampleMod == 0 {
+			// Create row struct
+			row := anonymizer.Row{
+				Schema: schema,
+				Data:   data,
+			}
+
+			// Anonymize the row
+			anonymizer.Anonymize(&row, r.cfg)
+
+			// Submit to writer
+			r.writer.Submit(row)
 		}
-
-		// Anonymize the row
-		anonymizer.Anonymize(&row, r.cfg)
-
-		// Submit to writer
-		r.writer.Submit(row)
+		rowCount++
 	}
 
 	return rows.Err()
@@ -151,18 +171,11 @@ func compareID(a, b interface{}) int {
 
 // processWithId handles reading and processing a table with an ID column, in batches
 func (r *Reader) processWithId(schema *db.TableSchema) error {
-	const batchSize = 100
-
-	// Find the name of the ID column
-	var idCol string
-	for _, col := range schema.Columns {
-		if col.IsID {
-			idCol = col.Name
-			break
-		}
-	}
-	if idCol == "" {
-		return fmt.Errorf("no ID column found for table %s", schema.Name)
+	const batchSize = 1000
+	samplePct, doSample := r.cfg.SampleTables[schema.Name]
+	batchWriteSize := batchSize
+	if doSample {
+		batchWriteSize = int(float64(batchSize) * samplePct / 100)
 	}
 
 	var lastID interface{}
@@ -174,14 +187,14 @@ func (r *Reader) processWithId(schema *db.TableSchema) error {
 		if firstBatch {
 			query = fmt.Sprintf(
 				"SELECT * FROM %s ORDER BY %s LIMIT %d",
-				schema.Name, idCol, batchSize,
+				schema.Name, schema.IDCol, batchSize,
 			)
 			args = []interface{}{}
 			firstBatch = false
 		} else {
 			query = fmt.Sprintf(
 				"SELECT * FROM %s WHERE %s > ? ORDER BY %s LIMIT %d",
-				schema.Name, idCol, idCol, batchSize,
+				schema.Name, schema.IDCol, schema.IDCol, batchSize,
 			)
 			args = []interface{}{lastID}
 		}
@@ -225,12 +238,15 @@ func (r *Reader) processWithId(schema *db.TableSchema) error {
 				Data:   data,
 			}
 
-			anonymizer.Anonymize(&row, r.cfg)
-			r.writer.Submit(row)
+			if rowCount < batchWriteSize {
+				fmt.Printf(" done.\n")
+				anonymizer.Anonymize(&row, r.cfg)
+				r.writer.Submit(row)
+			}
 			rowCount++
 
 			// Update maxID
-			idVal := data[idCol]
+			idVal := data[schema.IDCol]
 			ids = append(ids, idVal)
 			if maxID == nil || compareID(idVal, maxID) > 0 {
 				maxID = idVal
@@ -239,7 +255,7 @@ func (r *Reader) processWithId(schema *db.TableSchema) error {
 		rows.Close()
 
 		if rowCount > 0 {
-			r.writer.DeleteBatch(schema.Name, idCol, ids)
+			r.writer.DeleteBatch(schema.Name, schema.IDCol, ids)
 		}
 
 		if rowCount == 0 {

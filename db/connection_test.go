@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/andys/new_name/config"
+	"github.com/andys/new_names/config"
 	"github.com/frankban/quicktest"
 )
 

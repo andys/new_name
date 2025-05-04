@@ -1,10 +1,12 @@
 package config
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Config holds the anonymization configuration
@@ -13,9 +15,17 @@ type Config struct {
 	DestinationURL  string
 	ConfigFile      string
 	Debug           bool
-	Verbose         bool // Add this line
-	WorkerCount     int  // Number of workers for reader/writer pools
-	AnonymizeFields map[string][]string
+	Verbose         bool                // Add this line
+	WorkerCount     int                 // Number of workers for reader/writer pools
+	AnonymizeFields map[string][]string `yaml:"-"`
+	SkipTables      []string            // List of tables to skip
+	SampleTables    map[string]float64  // Table name to sample percentage
+}
+
+type yamlConfig struct {
+	Anonymize map[string]string  `yaml:"anonymize"`
+	Skip      []string           `yaml:"skip"`
+	Sample    map[string]float64 `yaml:"sample"`
 }
 
 // LoadConfig reads and parses the configuration file
@@ -26,31 +36,16 @@ func LoadConfig(cfg *Config, filename string) error {
 	}
 	defer file.Close()
 
-	// Initialize the map if it doesn't exist
-	if cfg.AnonymizeFields == nil {
-		cfg.AnonymizeFields = make(map[string][]string)
+	var ycfg yamlConfig
+	decoder := yaml.NewDecoder(file)
+	err = decoder.Decode(&ycfg)
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("failed to parse yaml config: %w", err)
 	}
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue // Skip empty lines and comments
-		}
-
-		// Split on first colon
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid config line format (expected 'table: fields'): %s", line)
-		}
-
-		tableName := strings.TrimSpace(parts[0])
-		if tableName == "" {
-			return fmt.Errorf("empty table name in config line: %s", line)
-		}
-
-		// Split fields on commas and trim whitespace
-		fields := strings.Split(parts[1], ",")
+	cfg.AnonymizeFields = make(map[string][]string)
+	for table, csvFields := range ycfg.Anonymize {
+		fields := strings.Split(csvFields, ",")
 		fieldList := make([]string, 0, len(fields))
 		for _, field := range fields {
 			field = strings.TrimSpace(field)
@@ -58,13 +53,18 @@ func LoadConfig(cfg *Config, filename string) error {
 				fieldList = append(fieldList, field)
 			}
 		}
-
-		cfg.AnonymizeFields[tableName] = fieldList
+		cfg.AnonymizeFields[table] = fieldList
 	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading config file: %w", err)
-	}
+	cfg.SkipTables = ycfg.Skip
 
+	if ycfg.Sample != nil {
+		cfg.SampleTables = make(map[string]float64, len(ycfg.Sample))
+		for table, pct := range ycfg.Sample {
+			cfg.SampleTables[table] = pct
+		}
+	} else {
+		cfg.SampleTables = make(map[string]float64)
+	}
 	return nil
 }

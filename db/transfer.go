@@ -115,6 +115,26 @@ func (c *Connection) DeleteBatchWithCount(table string, idCol string, ids []inte
 	if len(ids) == 0 {
 		return 0, nil
 	}
+	if len(ids) == 1 {
+		query := fmt.Sprintf(
+			"DELETE FROM %s WHERE %s > ?",
+			escapeIdentifier(table, c.Type),
+			escapeIdentifier(idCol, c.Type),
+		)
+		if c.cfg.Verbose {
+			fmt.Printf("Executing SQL: %s\n", query)
+		}
+		res, err := c.GetDB().Exec(query, ids[0])
+		if err != nil {
+			if c.cfg.Debug {
+				fmt.Fprintf(os.Stderr, "Error deleting from table %s: %v\n", table, err)
+			}
+			return 0, err
+		}
+		n, _ := res.RowsAffected()
+		return n, nil
+	}
+
 	minID := ids[0]
 	maxID := ids[len(ids)-1]
 

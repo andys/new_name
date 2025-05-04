@@ -1,11 +1,14 @@
 # Database Anonymizer
 
-Database Anonymizer is a tool for copying data from a source database to a destination database, while anonymizing sensitive fields. Rather than removing data, it replaces sensitive values (such as names, emails, etc.) with realistic fake data, preserving the structure and usability of the database for development, testing, or analytics.
+new_names is a tool for copying data from a source database to a destination database, while anonymizing sensitive
+personal data such as name fields.
+
+Rather than removing data, it replaces sensitive values (such as names, emails, etc.) with realistic fake data, preserving the structure and usability of the database for development, testing, or analytics.
 
 ## Features
 
 - **Supports MySQL and PostgreSQL**: Seamlessly works with both database types.
-- **Configurable Anonymization**: Specify which fields to anonymize per table using a simple config file.
+- **Configurable Anonymization**: Specify which fields to anonymize per table using a simple YAML config file.
 - **Parallel Processing**: Utilizes worker pools for fast, concurrent reading and writing of tables.
 - **Upsert or Truncate Logic**: If a table has an ID field, records are upserted; otherwise, the destination table is truncated before insert.
 - **Progress Reporting**: Periodically prints progress updates to the console.
@@ -14,7 +17,7 @@ Database Anonymizer is a tool for copying data from a source database to a desti
 ## Usage
 
 ```
-new_name --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] [--debug] [--verbose] [--workers <N>]
+new_names --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] [--debug] [--verbose] [--workers <N>]
 ```
 
 ### CLI Options
@@ -24,7 +27,7 @@ new_name --source <SOURCE_DB_URL> --dest <DEST_DB_URL> [--config <CONFIG_FILE>] 
 - `--dest`, `-d` (required): Destination database URL.  
   Example: `mysql://user:pass@host:port/dbname` or `postgres://user:pass@host:port/dbname`
 - `--config`, `-c`: Path to the anonymization config file.  
-  Default: `new_name.conf`
+  Default: `new_names.conf`
 - `--debug`: Enable debug mode with verbose error output.
 - `--verbose`, `-v`: Enable verbose SQL output.
 - `--workers`, `-w`: Number of workers for reader/writer pools.  
@@ -36,21 +39,24 @@ You can also set the following environment variables as alternatives to CLI flag
 
 ## Configuration File
 
-The configuration file specifies which fields in which tables should be anonymized.  
-Format (YAML-like, but comma-separated):
+The configuration file specifies which fields in which tables should be anonymized, as well as tables to skip and optional sampling percentages.  
+Format: YAML.
 
-```
-table_name: field1,field2
-table2: field1,field2,field3
+**Example (`new_names.conf` or `new_names.sample.conf`):**
+```yaml
+anonymize:
+  users: email, name, phone
+  orders: address
+skip:
+  - logs
+  - audit
+sample:
+  events: 0.1
 ```
 
-**Example (`new_name.conf` or `new_name.sample.conf`):**
-```
-users: name,email
-orders: address,phone
-```
-
-This means the `name` and `email` fields in the `users` table, and the `address` and `phone` fields in the `orders` table, will be anonymized.
+- The `anonymize` section lists tables and the fields to anonymize (comma-separated).
+- The `skip` section lists tables to exclude from processing.
+- The optional `sample` section allows you to specify a sampling percentage (e.g., `0.1` for 10%) for specific tables.
 
 ## How It Works
 
@@ -71,5 +77,5 @@ This means the `name` and `email` fields in the `users` table, and the `address`
 ## Example
 
 ```
-new_name --source "mysql://user:pass@localhost:3306/prod" --dest "mysql://user:pass@localhost:3306/dev" --config new_name.conf --verbose
+new_names --source "mysql://user:pass@localhost:3306/prod" --dest "mysql://user:pass@localhost:3306/dev" --config new_names.conf --verbose
 ```

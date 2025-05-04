@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/andys/new_name/config"
+	"github.com/andys/new_names/config"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 )

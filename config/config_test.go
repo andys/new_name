@@ -11,8 +11,15 @@ func TestLoadConfig_ParsesFieldsCorrectly(t *testing.T) {
 	c := quicktest.New(t)
 	// Create a temporary config file
 	content := `
-users: email, name, phone
-orders: address
+anonymize:
+  users: email, name, phone
+  orders: address
+skip:
+  - logs
+  - audit
+sample:
+  users: 0.1
+  orders: 0.5
 `
 	tmpfile, err := os.CreateTemp("", "testconfig*.conf")
 	c.Assert(err, quicktest.IsNil)
@@ -27,6 +34,11 @@ orders: address
 	c.Assert(cfg.AnonymizeFields, quicktest.DeepEquals, map[string][]string{
 		"users":  {"email", "name", "phone"},
 		"orders": {"address"},
+	})
+	c.Assert(cfg.SkipTables, quicktest.DeepEquals, []string{"logs", "audit"})
+	c.Assert(cfg.SampleTables, quicktest.DeepEquals, map[string]float64{
+		"users":  0.1,
+		"orders": 0.5,
 	})
 }
 

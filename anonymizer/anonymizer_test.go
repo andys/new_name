@@ -3,8 +3,8 @@ package anonymizer
 import (
 	"testing"
 
-	"github.com/andys/new_name/config"
-	"github.com/andys/new_name/db"
+	"github.com/andys/new_names/config"
+	"github.com/andys/new_names/db"
 	"github.com/frankban/quicktest"
 )
 
