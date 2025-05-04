@@ -239,7 +239,6 @@ func (r *Reader) processWithId(schema *db.TableSchema) error {
 			}
 
 			if rowCount < batchWriteSize {
-				fmt.Printf(" done.\n")
 				anonymizer.Anonymize(&row, r.cfg)
 				r.writer.Submit(row)
 			}
