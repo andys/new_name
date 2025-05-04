@@ -128,7 +128,7 @@ func (c *Connection) processSchemaRows(query string, args ...interface{}) ([]Tab
 			MaxLength: maxLength,
 		}
 
-		if isPrimary {
+		if column.IsID {
 			currentSchema.HasID = true
 		}
 
